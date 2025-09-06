@@ -1,0 +1,159 @@
+version: "3.8"
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: opensips-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  opensips:
+    build: .
+    container_name: opensips
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+    ports:
+      - "5062:5062/udp"
+      - "5062:5062/tcp"
+    volumes:
+      - ./opensips.cfg:/usr/local/etc/opensips/opensips.cfg
+      - ./opensips-cli.cfg:/root/.opensips-cli.cfg
+      - ./opensips-cli.cfg:/usr/local/etc/opensips/opensips-cli.cfg
+    command:
+      [
+        "opensips",
+        "-F",
+        "-f",
+        "/usr/local/etc/opensips/opensips.cfg",
+        "-m",
+        "64",
+        "-M",
+        "32"
+      ]
+
+  rtpengine:
+    image: fonoster/rtpengine:latest
+    container_name: rtpengine
+    ports:
+      - "22222:22222/udp"
+      - "23000-23100:23000-23100/udp"
+    environment:
+      - RTPENGINE_LOG_LEVEL=${RTPENGINE_LOG_LEVEL}
+      - RTPENGINE_PORT_MIN=${RTPENGINE_PORT_MIN}
+      - RTPENGINE_PORT_MAX=${RTPENGINE_PORT_MAX}
+      - RTPENGINE_PUBLIC_IP=${RTPENGINE_PUBLIC_IP}
+    restart: unless-stopped
+    networks:
+      - opensips_net
+
+volumes:
+  db_data:
+  opensips_data:
+
+networks:
+  opensips_net:
+    driver: bridge
+
+
+
+
+
+
+
+
+# version: "3.8"
+
+# services:
+#   db:
+#     image: mariadb:10.11
+#     container_name: opensips-mariadb
+#     environment:
+#       MYSQL_ROOT_PASSWORD: rootpassword
+#       MYSQL_DATABASE: opensips
+#       MYSQL_USER: opensips
+#       MYSQL_PASSWORD: opensipsrw
+#     ports:
+#       - "3307:3306"
+#     volumes:
+#       - db_data:/var/lib/mysql
+#     healthcheck:
+#       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+#       interval: 10s
+#       retries: 5
+#       timeout: 5s
+
+#   opensips:
+#     build: .
+#     # image: opensips/opensips:3.4
+#     container_name: opensips
+#     depends_on:
+#       db:
+#         condition: service_healthy
+#     environment:
+#       DB_HOST: db
+#       DB_USER: opensips
+#       DB_PASS: opensipsrw
+#       DB_NAME: opensips
+#     ports:
+#       - "5062:5062/udp"
+#       - "5062:5062/tcp"
+#       # - "5061:5061/tls"
+#     volumes:
+#       - ./opensips.cfg:/usr/local/etc/opensips/opensips.cfg
+#       # - opensips_data:/usr/local/etc/opensips
+#       - ./opensips-cli.cfg:/root/.opensips-cli.cfg
+#       - ./opensips-cli.cfg:/usr/local/etc/opensips/opensips-cli.cfg
+
+#     command:
+#       [
+#         "opensips",
+#         "-F",
+#         "-f",
+#         "/usr/local/etc/opensips/opensips.cfg",
+#         "-m",
+#         "64",
+#         "-M",
+#         "32",
+#       ]
+#   rtpengine:
+#     image: fonoster/rtpengine:latest
+#     container_name: rtpengine
+#     # network_mode: "host"
+#     ports:
+#       - "22222:22222/udp"
+#       - "23000-23100:23000-23100/udp"
+#     environment:
+#       - RTPENGINE_LOG_LEVEL=7
+#       - RTPENGINE_PORT_MIN=23000
+#       - RTPENGINE_PORT_MAX=23100
+#       - RTPENGINE_PUBLIC_IP=172.27.191.2
+#     restart: unless-stopped
+#     networks:
+#       - opensips_net
+#     # command: ["/usr/sbin/rtpengine"]  # This runs RTPengine, not OpenSIPS.
+
+# volumes:
+#   db_data:
+#   opensips_data:
+
+# networks:
+#   opensips_net:
+#     driver: bridge
